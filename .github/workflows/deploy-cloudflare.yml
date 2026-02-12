@@ -1,0 +1,54 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 安装 Rust 工具链
+      - run: rustup toolchain install stable --profile minimal
+      - run: rustup target add wasm32-unknown-unknown
+
+      # 缓存 Cargo 依赖和构建产物
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      # 安装系统编译依赖（ring crate 需要 clang）
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y lld clang
+
+      # 安装 worker-build（如果缓存中没有）
+      - name: Install worker-build
+        run: |
+          if ! command -v worker-build &> /dev/null; then
+            cargo install worker-build
+          fi
+
+      # 替换 wrangler.jsonc 中的 D1 数据库 ID
+      - name: Inject D1 Database ID
+        run: |
+          sed -i "s/009906c3-edd5-4b8b-84f3-f438c1867aaa/${{ secrets.D1_DATABASE_ID }}/g" wrangler.jsonc
+
+      # 部署到 Cloudflare Workers
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
