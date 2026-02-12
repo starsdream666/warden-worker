@@ -40,7 +40,7 @@ pub async fn config(headers: HeaderMap) -> Json<Value> {
           "url": "https://github.com/dani-garcia/vaultwarden"
         },
         "settings": {
-            "disableUserRegistration": true,
+            "disableUserRegistration": false,
         },
         "environment": {
           "vault": domain,
